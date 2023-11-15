@@ -1,0 +1,46 @@
+.tree-container {
+    position: relative;
+    width: 100px;
+    height: 200px;
+    overflow: hidden;
+}
+
+.tree .trunk {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 10px;
+    height: 50px;
+    background-color: #8B4513;
+    transform: translateX(-50%);
+}
+
+.tree .leaf {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: #228B22;
+    border-radius: 50%;
+    animation: flutter 1s infinite alternate;
+}
+
+.tree .leaf1 {
+    top: 10px;
+    left: 30px;
+}
+
+.tree .leaf2 {
+    top: 20px;
+    right: 30px;
+}
+
+.tree .leaf3 {
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+@keyframes flutter {
+    0% { transform: translateY(0) rotate(0); }
+    100% { transform: translateY(-5px) rotate(5deg); }
+}
