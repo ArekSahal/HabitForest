@@ -161,9 +161,10 @@ class Branch {
       this.velocity = createVector(0, 0);
       this.acceleration = createVector(0, 0);
       // Color properties
-      this.initialColor = color(27,141,87); // Green
-      this.finalColor = color(174,48,86); // Red
-      this.colorTransitionSpeed = 0.001;
+      this.initialColor = color(27,141,87,190); // Green
+      this.intermediateColor = color(255, 215, 0,190); // Yellow (or any other color you prefer)
+      this.finalColor = color(174,48,86,190); // Red
+      this.colorTransitionSpeed = 0.01;
       this.currentColor = this.initialColor;
       this.timeOnGround = 0; // Time spent on the ground
       this.decompositionTime = 1000; // Time after which the leaf gets deleted
@@ -171,12 +172,15 @@ class Branch {
   
     // Update leaf color based on age
     updateColor() {
-      if (this.compost < 1000) { // Change 100 to control how fast color changes
-        this.currentColor = lerpColor(this.initialColor, this.finalColor, this.compost * this.colorTransitionSpeed);
-      } else {
+      if (this.compost < 100) { // First transition to intermediate color
+        this.currentColor = lerpColor(this.initialColor, this.intermediateColor, this.compost * this.colorTransitionSpeed);
+    } else if (this.compost < 500) { // Then transition to final color
+        this.currentColor = lerpColor(this.intermediateColor, this.finalColor, (this.compost - 100) * this.colorTransitionSpeed);
+    } else {
         this.currentColor = this.finalColor;
-      }
     }
+}
+    
   
     physics(force) {
       if (!this.status && this.position.y < height) {
