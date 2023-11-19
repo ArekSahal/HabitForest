@@ -1,5 +1,5 @@
 class Tree {
-    constructor(x, y, trunkLength) {
+    constructor(x, y, trunkLength, colorChangeSpeed = 0.005,dropLeafRate = 0.00005,leafSpawnRate = 1) {
         let a = createVector(x, y);
         let b = createVector(x, y - trunkLength); // Ensures the trunk is straight up
         this.root = new Branch(a, b, null, 1);
@@ -10,11 +10,14 @@ class Tree {
         this.windStrengthOffset = random(1000)*0;
         this.windAngleOffset = random(1000)*0;
         this.windModifier = random(0.5, 2); // Adjust the range as needed
-    }
+        this.colorChangeSpeed = colorChangeSpeed; // Add this line
+        this.dropLeafRate = dropLeafRate;
+        this.leafSpawnRate = leafSpawnRate; // New property for leaf spawn rate
+    }  
 
     createInitialBranches() {
         // Randomly decide the number of initial branching iterations
-        let iterations = Math.floor(random(3, 6));
+        let iterations = Math.floor(random(5, 6));
         for (let j = 0; j < iterations; j++) {
             for (let i = this.branches.length - 1; i >= 0; i--) {
                 if (!this.branches[i].finished) {
@@ -25,6 +28,10 @@ class Tree {
             }
         }
     }
+    increaseColorChangeSpeed() {
+      this.colorChangeSpeed *= 10;
+  }
+  
 
     growAndShow(globalWind) {
          // Create a unique wind vector for this tree
@@ -39,16 +46,18 @@ class Tree {
             branch.grow();
             branch.physics(combinedWind);
          
-            if (!branch.finished && !branch.leaf) {
-                branch.leaf = true;
-                let leaf = new Leaf(branch);
-                this.leaves.push(leaf);
-            }
+            if (!branch.finished && !branch.leaf && Math.random() < this.leafSpawnRate) {
+              branch.leaf = true;
+              let leaf = new Leaf(branch, this.dropLeafRate); // Pass dropLeafRate here
+              this.leaves.push(leaf);
+          }
         }
 
         for (let leaf of this.leaves) {
+          leaf.colorTransitionSpeed = this.colorChangeSpeed
+          leaf.dropLeafRate = this.dropLeafRate
             leaf.show();
-            leaf.physics(combinedWind);
+            leaf.physics(globalWind);
         }
          // Remove old leaves
          this.leaves = this.leaves.filter(leaf => {
@@ -87,6 +96,7 @@ class Branch {
     this.maxDisplacement = 10; // Maximum displacement, adjust as needed
 
     }
+ 
   
     physics(globalWind) {
         // Calculate branch-specific wind using Perlin noise
@@ -149,7 +159,7 @@ class Branch {
   }
   
   class Leaf {
-    constructor(branch) {
+    constructor(branch,dropLeafRate) {
       this.branch = branch;
       this.position = branch.end.copy();
       this.currentSize = 1;
@@ -168,35 +178,39 @@ class Branch {
       this.currentColor = this.initialColor;
       this.timeOnGround = 0; // Time spent on the ground
       this.decompositionTime = 1000; // Time after which the leaf gets deleted
+      this.dropLeafRate = dropLeafRate;
     }
   
     // Update leaf color based on age
     updateColor() {
-      if (this.compost < 100) { // First transition to intermediate color
+      if (this.compost < 50) { // First transition to intermediate color
         this.currentColor = lerpColor(this.initialColor, this.intermediateColor, this.compost * this.colorTransitionSpeed);
-    } else if (this.compost < 500) { // Then transition to final color
-        this.currentColor = lerpColor(this.intermediateColor, this.finalColor, (this.compost - 100) * this.colorTransitionSpeed);
+    } else if (this.compost < 1000) { // Then transition to final color
+        this.currentColor = lerpColor(this.intermediateColor, this.finalColor, (this.compost - 50) * this.colorTransitionSpeed);
     } else {
         this.currentColor = this.finalColor;
     }
 }
     
   
-    physics(force) {
-      if (!this.status && this.position.y < height) {
-        let g = createVector(0, Math.random() * 0.05);
-        this.acceleration = force.copy().div(this.mass).add(g);
-        this.velocity.add(this.acceleration);
-        this.position.add(this.velocity);
-      }
-    }
+physics(force) {
+  if (!this.status && this.position.y < height) {
+      let g = createVector(0, Math.random() * 0.05); // Gravity
+      let windInfluence = force.copy().mult(5); // Increase the influence of wind
+      let turbulence = createVector(random(-0.3, 0.3), random(-0.2, 0.2)); // Add some turbulence
+
+      this.acceleration = windInfluence.add(g).add(turbulence);
+      this.velocity.add(this.acceleration);
+      this.position.add(this.velocity);
+  }
+}
   
     show() {
-      if (Math.random() < 0.00005) {
+      if (Math.random() < this.dropLeafRate) {
         this.status = false;
         this.branch.leaf = false;
-      }
-      if (Math.random() < 0.05) {
+    }
+      if (Math.random() < this.colorTransitionSpeed) {
         this.compost++;
       }
 
@@ -210,7 +224,7 @@ class Branch {
       ellipse(this.status ? this.branch.realEnd.x : this.position.x, this.status ? this.branch.realEnd.y : this.position.y, size, size);
     
       if (!this.status) {
-        this.compost++;
+        //this.compost++;
         this.timeOnGround++;
       }
       // Increment time on ground if the leaf has fallen
@@ -223,9 +237,42 @@ class Branch {
   // Global variables for tree and leaves
 
 let trees = [];
+let changeSpeedButton;
+let increaseLeafDropButton;
+let resetButton;
+let resetPropertiesButton;
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
+
+    // Create an input field for the number of trees
+    treeCountInput = createInput('2'); // Default value is 2
+    treeCountInput.position(10, 130); // Adjust position as needed
+
+      // Create a button to increase color change speed
+      changeSpeedButton = createButton('Fall');
+      changeSpeedButton.position(10, 10);
+      changeSpeedButton.mousePressed(increaseAllTreesColorChangeSpeed);
+
+    // Create a reset button
+    resetButton = createButton('Reset Trees');
+    resetButton.position(10, 100); // Adjust position as needed
+    resetButton.mousePressed(resetTrees);
+  
+      // Create a button to increase leaf drop rate
+      increaseLeafDropButton = createButton('Winter');
+      increaseLeafDropButton.position(10, 40); // Adjust position as needed
+      increaseLeafDropButton.mousePressed(increaseAllTreesLeafDropRate);
+      increaseLeafDropButton.mousePressed(() => {
+        trees.forEach(tree => {
+            tree.dropLeafRate *= 100;
+            tree.leafSpawnRate *= 0; // Decrease leaf spawn rate
+        });
+    });
+        // Create a reset properties button
+        resetPropertiesButton = createButton('Summer');
+        resetPropertiesButton.position(10, 70); // Adjust position as needed
+        resetPropertiesButton.mousePressed(resetTreeProperties);
 
     let n_trees = 2;
     let segmentWidth = width / n_trees; // Width of each segment
@@ -257,4 +304,46 @@ function draw() {
 for (let tree of trees) {
     tree.growAndShow(globalWind);
 }
+}
+function mouseClicked() {
+  trees.forEach(tree => {
+      // Check the distance from the click to the base of the tree
+      let d = dist(mouseX, mouseY, tree.root.begin.x, tree.root.begin.y);
+      if (d < 50) { // Adjust this value as needed for the click detection radius
+          tree.increaseColorChangeSpeed();
+      }
+  });
+
+}
+
+function increaseAllTreesColorChangeSpeed() {
+  trees.forEach(tree => tree.increaseColorChangeSpeed());
+}
+function increaseAllTreesLeafDropRate() {
+  trees.forEach(tree => tree.dropLeafRate *= 10);
+}
+
+function resetTrees() {
+  let n_trees = parseInt(treeCountInput.value()); // Get the number of trees from the input field
+  n_trees = isNaN(n_trees) ? 2 : n_trees; // Default to 2 trees if input is not a number
+
+  trees = []; // Clear existing trees
+  let segmentWidth = width / n_trees;
+
+  for (let i = 0; i < n_trees; i++) {
+      let x = random(i * segmentWidth, (i + 1) * segmentWidth);
+      let y = height;
+      let trunkLength = random(100, 200);
+      trees.push(new Tree(x, y, trunkLength, 0.005, 0.00005, 1));
+  }
+}
+
+function resetTreeProperties() {
+  trees.forEach(tree => {
+      // Reset each tree's properties to their initial values
+      tree.colorChangeSpeed = 0.005;
+      tree.dropLeafRate = 0.00005;
+      tree.leafSpawnRate = 1;
+      // You can add other properties here if needed
+  });
 }
