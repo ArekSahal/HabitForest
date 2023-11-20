@@ -2,7 +2,7 @@ class Tree {
     constructor(x, y, trunkLength, colorChangeSpeed = 0.005,dropLeafRate = 0.00005,leafSpawnRate = 1) {
         let a = createVector(x, y);
         let b = createVector(x, y - trunkLength); // Ensures the trunk is straight up
-        this.root = new Branch(a, b, null, 1);
+        this.root = new Branch(a, b, null,this, 1);
         this.branches = [this.root];
         this.leaves = [];
         this.createInitialBranches();
@@ -13,7 +13,8 @@ class Tree {
         this.colorChangeSpeed = colorChangeSpeed; // Add this line
         this.dropLeafRate = dropLeafRate;
         this.leafSpawnRate = leafSpawnRate; // New property for leaf spawn rate
-    }  
+        this.isWinter = false;
+      }  
 
     createInitialBranches() {
         // Randomly decide the number of initial branching iterations
@@ -21,13 +22,18 @@ class Tree {
         for (let j = 0; j < iterations; j++) {
             for (let i = this.branches.length - 1; i >= 0; i--) {
                 if (!this.branches[i].finished) {
-                    let newBranches = this.branches[i].branchOut();
+                    let newBranches = this.branches[i].branchOut(this);
                     this.branches[i].finished = true;
                     this.branches.push(...newBranches);
                 }
             }
         }
     }
+
+    setWinterMode() {
+      this.isWinter = true;
+  }
+
     increaseColorChangeSpeed() {
       this.colorChangeSpeed *= 10;
   }
@@ -71,7 +77,8 @@ class Tree {
 
 
 class Branch {
-    constructor(begin, end, parent, mass) {
+    constructor(begin, end, parent,tree, mass) {
+      this.tree = tree;
       this.begin = begin;
       this.end = end;
       this.currentEnd = begin;
@@ -93,7 +100,7 @@ class Branch {
     this.limit = random(PI / 3, PI / 2);
     this.windStrengthOffset = random(1000);
     this.windAngleOffset = random(1000);
-    this.maxDisplacement = 10; // Maximum displacement, adjust as needed
+    this.maxDisplacement = 5; // Maximum displacement, adjust as needed
 
     }
  
@@ -150,10 +157,10 @@ class Branch {
       line(this.parent ? this.parent.realEnd.x : this.begin.x, this.parent ? this.parent.realEnd.y : this.begin.y, this.realEnd.x, this.realEnd.y);
     }
   
-    branchOut() {
+    branchOut(tree) {
       return this.branchRules.map(rule => {
         let dir = p5.Vector.sub(this.end, this.begin).rotate(rule[0]).mult(rule[1]);
-        return new Branch(this.end, p5.Vector.add(this.end, dir), this, this.mass * 0.80);
+        return new Branch(this.end, p5.Vector.add(this.end, dir), this, tree,this.mass * 0.80);
       });
     }
   }
@@ -179,22 +186,29 @@ class Branch {
       this.timeOnGround = 0; // Time spent on the ground
       this.decompositionTime = 1000; // Time after which the leaf gets deleted
       this.dropLeafRate = dropLeafRate;
+      this.winterColor = color(255, 255, 255, 190); // White color
     }
   
     // Update leaf color based on age
     updateColor() {
-      if (this.compost < 50) { // First transition to intermediate color
+      if (this.branch.tree.isWinter) {
+        this.currentColor = lerpColor(this.initialColor, this.winterColor, this.compost * this.colorTransitionSpeed);
+    }
+    
+      else if (this.compost < 50) { // First transition to intermediate color
         this.currentColor = lerpColor(this.initialColor, this.intermediateColor, this.compost * this.colorTransitionSpeed);
     } else if (this.compost < 1000) { // Then transition to final color
         this.currentColor = lerpColor(this.intermediateColor, this.finalColor, (this.compost - 50) * this.colorTransitionSpeed);
     } else {
         this.currentColor = this.finalColor;
     }
+
+    
 }
     
   
 physics(force) {
-  if (!this.status && this.position.y < height) {
+  if (!this.status && this.position.y < (height )) {
       let g = createVector(0, Math.random() * 0.05); // Gravity
       let windInfluence = force.copy().mult(5); // Increase the influence of wind
       let turbulence = createVector(random(-0.3, 0.3), random(-0.2, 0.2)); // Add some turbulence
@@ -237,9 +251,9 @@ physics(force) {
   // Global variables for tree and leaves
 
 let trees = [];
-let changeSpeedButton;
-let increaseLeafDropButton;
-let resetButton;
+let fallButton;
+let winterButton;
+let summerButton;
 let resetPropertiesButton;
 
 function setup() {
@@ -250,25 +264,33 @@ function setup() {
     treeCountInput.position(10, 130); // Adjust position as needed
 
       // Create a button to increase color change speed
-      changeSpeedButton = createButton('Fall');
-      changeSpeedButton.position(10, 10);
-      changeSpeedButton.mousePressed(increaseAllTreesColorChangeSpeed);
-
-    // Create a reset button
-    resetButton = createButton('Reset Trees');
-    resetButton.position(10, 100); // Adjust position as needed
-    resetButton.mousePressed(resetTrees);
-  
-      // Create a button to increase leaf drop rate
-      increaseLeafDropButton = createButton('Winter');
-      increaseLeafDropButton.position(10, 40); // Adjust position as needed
-      increaseLeafDropButton.mousePressed(increaseAllTreesLeafDropRate);
-      increaseLeafDropButton.mousePressed(() => {
+      fallButton = createButton('Fall');
+      fallButton.position(10, 10);
+      fallButton.mousePressed(() => {
         trees.forEach(tree => {
-            tree.dropLeafRate *= 100;
-            tree.leafSpawnRate *= 0; // Decrease leaf spawn rate
+            tree.dropLeafRate = 0.001;
+            tree.leafSpawnRate = 0.0005; // Decrease leaf spawn rate
+            tree.colorChangeSpeed = 0.03;
+            tree.isWinter=false;
         });
     });
+
+    // Create a reset button
+    summerButton = createButton('Reset Trees');
+    summerButton.position(10, 100); // Adjust position as needed
+    summerButton.mousePressed(resetTrees);
+  
+      // Create a button to increase leaf drop rate
+      winterButton = createButton('Winter');
+      winterButton.position(10, 40); // Adjust position as needed
+    winterButton.mousePressed(() => {
+      trees.forEach(tree => {
+          tree.isWinter=true; // Set the winter mode for each tree
+          tree.dropLeafRate = 0.005;
+          tree.leafSpawnRate = 0.00001; // Decrease leaf spawn rate
+          tree.colorChangeSpeed = 0.05;
+      });
+  });
         // Create a reset properties button
         resetPropertiesButton = createButton('Summer');
         resetPropertiesButton.position(10, 70); // Adjust position as needed
@@ -344,6 +366,7 @@ function resetTreeProperties() {
       tree.colorChangeSpeed = 0.005;
       tree.dropLeafRate = 0.00005;
       tree.leafSpawnRate = 1;
+      tree.isWinter=true;
       // You can add other properties here if needed
   });
 }
